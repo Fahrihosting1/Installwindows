@@ -46,7 +46,7 @@ case $PILIHAN in
   4)
     OS_NAME="Tiny11 23H2 (Ringan - Win11 - Atlas Ready!)"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://archive.org/download/tiny-11-NTDEV/23H2%20x64.iso"
+    ISO_URL="https://archive.org/download/tiny-11-NTDEV/tiny11%2023H2%20x64.iso"
     ;;
   5)
     OS_NAME="Windows Server 2022"
