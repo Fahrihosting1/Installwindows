@@ -21,10 +21,11 @@ echo -e "${YELLOW}Pilih OS yang mau diinstall:${NC}"
 echo ""
 echo -e "  ${GREEN}[1]${NC} Windows 10 Pro (Original)"
 echo -e "  ${GREEN}[2]${NC} Windows 11 Pro (Original)"
-echo -e "  ${GREEN}[3]${NC} Tiny10 23H2 x64 (Ringan - Recommended)"
-echo -e "  ${GREEN}[4]${NC} Windows Server 2022"
+echo -e "  ${GREEN}[3]${NC} Tiny10 23H2 x64 (Ringan - Win10)"
+echo -e "  ${GREEN}[4]${NC} Tiny11 23H2 x64 (Ringan - Win11 - Atlas Ready!)"
+echo -e "  ${GREEN}[5]${NC} Windows Server 2022"
 echo ""
-read -p "Masukkan pilihan [1-4]: " PILIHAN
+read -p "Masukkan pilihan [1-5]: " PILIHAN
 
 case $PILIHAN in
   1)
@@ -38,11 +39,16 @@ case $PILIHAN in
     ISO_URL="https://archive.org/download/windows-11-23h2/Windows11_23H2_x64.iso"
     ;;
   3)
-    OS_NAME="Tiny10 23H2 (Ringan)"
+    OS_NAME="Tiny10 23H2 (Ringan - Win10)"
     IMAGE_NAME="Windows 10 Pro"
     ISO_URL="https://archive.org/download/tiny-10-23-h2/tiny10%20x64%2023h2.iso"
     ;;
   4)
+    OS_NAME="Tiny11 23H2 (Ringan - Win11 - Atlas Ready!)"
+    IMAGE_NAME="Windows 11 Pro"
+    ISO_URL="https://archive.org/download/tiny-11-NTDEV/23H2%20x64.iso"
+    ;;
+  5)
     OS_NAME="Windows Server 2022"
     IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
     ISO_URL="https://archive.org/download/windows-server-2022/WindowsServer2022.iso"
@@ -98,7 +104,7 @@ echo ""
 echo -e "${GREEN}====================================="
 echo -e " Install selesai! VPS akan reboot..."
 echo -e " Tunggu 15-30 menit lalu RDP ke:"
-echo -e " IP       : $(curl -s ifconfig.me 2>/dev/null || echo 'cek di AWS console')"
+echo -e " IP       : $(curl -s ifconfig.me 2>/dev/null || echo 'cek di panel VPS')"
 echo -e " Port     : 3389"
 echo -e " Username : Administrator"
 echo -e " Password : Admin123"
