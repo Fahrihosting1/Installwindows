@@ -128,6 +128,9 @@ echo -e "${YELLOW}[*] Mendownload script reinstall...${NC}"
 wget -qO /tmp/reinstall.sh https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh
 chmod +x /tmp/reinstall.sh
 
+# Cek apakah versi reinstall.sh support --firstboot-powershell
+SUPPORT_FIRSTBOOT=$(bash /tmp/reinstall.sh --help 2>&1 | grep -c "firstboot-powershell" || true)
+
 update_status "INSTALLING"
 echo -e "${YELLOW}[*] Menjalankan instalasi Windows...${NC}"
 echo -e "${YELLOW}[*] Proses ini membutuhkan waktu 30-60 menit...${NC}"
@@ -135,13 +138,24 @@ echo ""
 
 OPENSSH_SCRIPT='Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0; Start-Service sshd; Set-Service -Name sshd -StartupType Automatic; New-NetFirewallRule -Name sshd -DisplayName "OpenSSH Server" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22'
 
-bash /tmp/reinstall.sh windows \
-  --image-name "$IMAGE_NAME" \
-  --iso "$ISO_URL" \
-  --username Administrator \
-  --password Admin123 \
-  --rdp-port 3389 \
-  --firstboot-powershell "$OPENSSH_SCRIPT"
+if [[ "$SUPPORT_FIRSTBOOT" -gt 0 ]]; then
+    echo -e "${GREEN}[*] Mode: dengan Auto OpenSSH${NC}"
+    bash /tmp/reinstall.sh windows \
+      --image-name "$IMAGE_NAME" \
+      --iso "$ISO_URL" \
+      --username Administrator \
+      --password Admin123 \
+      --rdp-port 3389 \
+      --firstboot-powershell "$OPENSSH_SCRIPT"
+else
+    echo -e "${YELLOW}[*] Mode: tanpa Auto OpenSSH (aktifkan manual via RDP setelah selesai)${NC}"
+    bash /tmp/reinstall.sh windows \
+      --image-name "$IMAGE_NAME" \
+      --iso "$ISO_URL" \
+      --username Administrator \
+      --password Admin123 \
+      --rdp-port 3389
+fi
 
 update_status "REBOOTING"
 echo ""
@@ -150,10 +164,18 @@ echo -e " Install selesai! VPS akan reboot..."
 echo -e " Tunggu 15-30 menit lalu akses ke:"
 echo -e " IP       : $VPS_IP"
 echo -e " RDP Port : 3389"
-echo -e " SSH Port : 22"
+echo -e " SSH Port : 22 (jika OpenSSH aktif)"
 echo -e " Username : Administrator"
 echo -e " Password : Admin123"
 echo -e "=====================================${NC}"
+
+if [[ "$SUPPORT_FIRSTBOOT" -eq 0 ]]; then
+    echo -e "${YELLOW}[!] OpenSSH tidak diinstall otomatis."
+    echo -e "[!] Setelah masuk RDP, jalankan di PowerShell:"
+    echo -e "    Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+    echo -e "    Start-Service sshd"
+    echo -e "    Set-Service -Name sshd -StartupType Automatic${NC}"
+fi
 
 update_status "DONE: IP=$VPS_IP RDP=3389 SSH=22 USER=Administrator PASS=Admin123"
 
