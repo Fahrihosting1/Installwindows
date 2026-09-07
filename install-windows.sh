@@ -78,7 +78,7 @@ case $PILIHAN in
   6)
     OS_NAME="Windows Server 2022"
     IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
-    ISO_URL="https://archive.org/download/windows-server-2022/WindowsServer2022.iso"
+    ISO_URL="https://archive.org/download/en_windows_server_2022x64_dvd_/en_windows_server_2022x64_dvd_.iso"
     ;;
   7)
     OS_NAME="Windows Server 2025 Datacenter"
