@@ -58,7 +58,7 @@ case $PILIHAN in
   2)
     OS_NAME="Windows 11 Pro"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://archive.org/download/win11-23h2-en-fr/en-us_windows_11_consumer_editions_version_23h2_updated_oct_2025_x64_dvd_8deeaabd.iso"
+    ISO_URL="https://archive.org/download/windows-11-versions_202307/Windows%2011%202023%20%2823H2%29%20%282023%20Update%29.iso"
     ;;
   3)
     OS_NAME="Tiny10 23H2 (Ringan - Win10)"
