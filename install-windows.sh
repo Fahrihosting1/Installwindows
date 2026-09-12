@@ -142,6 +142,25 @@ chmod +x /tmp/reinstall.sh
 
 SUPPORT_FIRSTBOOT=$(bash /tmp/reinstall.sh --help 2>&1 | grep -c "firstboot-powershell" || true)
 
+# Detect dan fix disk ID yang invalid
+MAIN_DISK=$(lsblk -dpno NAME,TYPE | awk '$2=="disk"{print $1}' | grep -v "loop" | head -1)
+echo -e "${YELLOW}[*] Disk terdeteksi: ${GREEN}$MAIN_DISK${NC}"
+if [ -n "$MAIN_DISK" ]; then
+    DISK_ID=$(blkid -s PTUUID -o value "$MAIN_DISK" 2>/dev/null || echo "")
+    if [ -z "$DISK_ID" ]; then
+        echo -e "${YELLOW}[*] Disk ID kosong, set manual...${NC}"
+        sfdisk --disk-id "$MAIN_DISK" 0x12345678 > /dev/null 2>&1 ||         printf "x
+i
+0x12345678
+r
+w
+" | fdisk "$MAIN_DISK" > /dev/null 2>&1 || true
+        echo -e "${GREEN}[✓] Disk ID berhasil di-set${NC}"
+    else
+        echo -e "${GREEN}[✓] Disk ID OK: $DISK_ID${NC}"
+    fi
+fi
+
 update_status "INSTALLING"
 echo -e "${YELLOW}[*] Menjalankan instalasi Windows...${NC}"
 echo -e "${YELLOW}[*] Proses ini membutuhkan waktu 30-60 menit...${NC}"
