@@ -53,37 +53,37 @@ case $PILIHAN in
   1)
     OS_NAME="Windows 10 Pro"
     IMAGE_NAME="Windows 10 Pro"
-    ISO_URL="https://archive.org/download/windows-10-22h2_202507/Windows%2010%2022H2%20Direct%20Microsoft.iso"
+    ISO_URL="https://massgrave.dev/img/Win10_22H2_English_x64.iso"
     ;;
   2)
     OS_NAME="Windows 11 Pro"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://archive.org/download/windows-11-versions_202307/Windows%2011%202023%20%2823H2%29%20%282023%20Update%29.iso"
+    ISO_URL="https://massgrave.dev/img/Win11_24H2_English_x64.iso"
     ;;
   3)
     OS_NAME="Tiny10 23H2 (Ringan - Win10)"
     IMAGE_NAME="Windows 10 Pro"
-    ISO_URL="https://archive.org/download/tiny-10-23-h2/tiny10%20x64%2023h2.iso"
+    ISO_URL="https://github.com/ntdevlabs/tiny11builder/releases/download/tiny10-23H2/tiny10_x64_23h2.iso"
     ;;
   4)
     OS_NAME="Tiny11 23H2 (Ringan - Win11)"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://archive.org/download/tiny-11-NTDEV/tiny11%2023H2%20x64.iso"
+    ISO_URL="https://github.com/ntdevlabs/tiny11builder/releases/download/tiny11-23H2/tiny11_x64_23h2.iso"
     ;;
   5)
     OS_NAME="Tiny11 25H2 (Terbaru - Ringan)"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://archive.org/download/tiny11_25H2/tiny11_25H2_Nov25.iso"
+    ISO_URL="https://github.com/ntdevlabs/tiny11builder/releases/latest/download/tiny11_x64_25h2.iso"
     ;;
   6)
     OS_NAME="Windows Server 2022"
     IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
-    ISO_URL="https://archive.org/download/en_windows_server_2022x64_dvd_/en_windows_server_2022x64_dvd_.iso"
+    ISO_URL="https://go.microsoft.com/fwlink/p/?LinkID=2195280&clcid=0x409&culture=en-us&country=US"
     ;;
   7)
     OS_NAME="Windows Server 2025 Datacenter"
     IMAGE_NAME="Windows Server 2025 SERVERDATACENTER"
-    ISO_URL="https://go.microsoft.com/fwlink/?linkid=2293312"
+    ISO_URL="https://go.microsoft.com/fwlink/?linkid=2293313&clcid=0x409&culture=en-us&country=US"
     ;;
   *)
     echo -e "${RED}Pilihan tidak valid!${NC}"
@@ -113,6 +113,18 @@ if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
     update_status "CANCELLED"
     exit 0
 fi
+
+update_status "CHECKING_URL"
+echo ""
+echo -e "${YELLOW}[*] Mengecek URL ISO...${NC}"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 20 -r 0-0 "$ISO_URL")
+if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "206" ]]; then
+    echo -e "${RED}[!] URL ISO tidak bisa diakses (HTTP $HTTP_CODE): $ISO_URL${NC}"
+    echo -e "${RED}[!] Install dibatalkan. Coba pilih OS lain atau cek koneksi VPS.${NC}"
+    update_status "ERROR: URL ISO tidak bisa diakses (HTTP $HTTP_CODE)"
+    exit 1
+fi
+echo -e "${GREEN}[✓] URL ISO OK (HTTP $HTTP_CODE)${NC}"
 
 update_status "DOWNLOADING"
 echo ""
