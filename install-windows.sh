@@ -53,37 +53,37 @@ case $PILIHAN in
   1)
     OS_NAME="Windows 10 Pro"
     IMAGE_NAME="Windows 10 Pro"
-    ISO_URL="https://drive.massgrave.dev/en-us_windows_10_consumer_editions_version_22h2_updated_sep_2023_x64_dvd_a2152612.iso"
+    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66749/19045.2006.220908-0225.22h2_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
     ;;
   2)
     OS_NAME="Windows 11 Pro"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://drive.massgrave.dev/en-us_windows_11_consumer_editions_version_24h2_x64_dvd_3d3b2596.iso"
+    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66750/26100.1742.240906-0331.ge_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
     ;;
   3)
     OS_NAME="Tiny10 23H2 (Ringan - Win10)"
     IMAGE_NAME="Windows 10 Pro"
-    ISO_URL="https://sourceforge.net/projects/tiny-11-releases/files/Tiny11-Pro-25H2/Tiny11-25H2-26200.8037-English-Pro-2026-08-23.iso/download"
+    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66749/19045.2006.220908-0225.22h2_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
     ;;
   4)
     OS_NAME="Tiny11 23H2 (Ringan - Win11)"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://sourceforge.net/projects/tiny-11-releases/files/Tiny11-Pro-25H2/Tiny11-25H2-26200.8037-English-Pro-2026-08-23.iso/download"
+    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66750/26100.1742.240906-0331.ge_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
     ;;
   5)
     OS_NAME="Tiny11 25H2 (Terbaru - Ringan)"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://sourceforge.net/projects/tiny-11-releases/files/Tiny11-Pro-25H2/Tiny11-25H2-26200.8037-English-Pro-2026-08-23.iso/download"
+    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66750/26100.1742.240906-0331.ge_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
     ;;
   6)
     OS_NAME="Windows Server 2022"
     IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
-    ISO_URL="https://drive.massgrave.dev/en-us_windows_server_2022_x64_dvd_620d7eac.iso"
+    ISO_URL="https://software-static.download.prss.microsoft.com/sg/download/888969d5-f34g-4e03-ac9d-1f9786c66749/SERVER_EVAL_x64FRE_en-us.iso"
     ;;
   7)
     OS_NAME="Windows Server 2025 Datacenter"
     IMAGE_NAME="Windows Server 2025 SERVERDATACENTER"
-    ISO_URL="https://drive.massgrave.dev/en-us_windows_server_2025_x64_dvd_b7ec10f3.iso"
+    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.32230.260111-0550.lt_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso"
     ;;
   *)
     echo -e "${RED}Pilihan tidak valid!${NC}"
