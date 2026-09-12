@@ -53,37 +53,37 @@ case $PILIHAN in
   1)
     OS_NAME="Windows 10 Pro"
     IMAGE_NAME="Windows 10 Pro"
-    ISO_URL="https://massgrave.dev/img/Win10_22H2_English_x64.iso"
+    ISO_URL="https://drive.massgrave.dev/en-us_windows_10_consumer_editions_version_22h2_updated_sep_2023_x64_dvd_a2152612.iso"
     ;;
   2)
     OS_NAME="Windows 11 Pro"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://massgrave.dev/img/Win11_24H2_English_x64.iso"
+    ISO_URL="https://drive.massgrave.dev/en-us_windows_11_consumer_editions_version_24h2_x64_dvd_3d3b2596.iso"
     ;;
   3)
     OS_NAME="Tiny10 23H2 (Ringan - Win10)"
     IMAGE_NAME="Windows 10 Pro"
-    ISO_URL="https://github.com/ntdevlabs/tiny11builder/releases/download/tiny10-23H2/tiny10_x64_23h2.iso"
+    ISO_URL="https://sourceforge.net/projects/tiny-11-releases/files/Tiny11-Pro-25H2/Tiny11-25H2-26200.8037-English-Pro-2026-08-23.iso/download"
     ;;
   4)
     OS_NAME="Tiny11 23H2 (Ringan - Win11)"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://github.com/ntdevlabs/tiny11builder/releases/download/tiny11-23H2/tiny11_x64_23h2.iso"
+    ISO_URL="https://sourceforge.net/projects/tiny-11-releases/files/Tiny11-Pro-25H2/Tiny11-25H2-26200.8037-English-Pro-2026-08-23.iso/download"
     ;;
   5)
     OS_NAME="Tiny11 25H2 (Terbaru - Ringan)"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://github.com/ntdevlabs/tiny11builder/releases/latest/download/tiny11_x64_25h2.iso"
+    ISO_URL="https://sourceforge.net/projects/tiny-11-releases/files/Tiny11-Pro-25H2/Tiny11-25H2-26200.8037-English-Pro-2026-08-23.iso/download"
     ;;
   6)
     OS_NAME="Windows Server 2022"
     IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
-    ISO_URL="https://go.microsoft.com/fwlink/p/?LinkID=2195280&clcid=0x409&culture=en-us&country=US"
+    ISO_URL="https://drive.massgrave.dev/en-us_windows_server_2022_x64_dvd_620d7eac.iso"
     ;;
   7)
     OS_NAME="Windows Server 2025 Datacenter"
     IMAGE_NAME="Windows Server 2025 SERVERDATACENTER"
-    ISO_URL="https://go.microsoft.com/fwlink/?linkid=2293313&clcid=0x409&culture=en-us&country=US"
+    ISO_URL="https://drive.massgrave.dev/en-us_windows_server_2025_x64_dvd_b7ec10f3.iso"
     ;;
   *)
     echo -e "${RED}Pilihan tidak valid!${NC}"
