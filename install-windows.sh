@@ -53,37 +53,37 @@ case $PILIHAN in
   1)
     OS_NAME="Windows 10 Pro"
     IMAGE_NAME="Windows 10 Pro"
-    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66749/19045.2006.220908-0225.22h2_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
+    ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Windows10Pro.iso"
     ;;
   2)
     OS_NAME="Windows 11 Pro"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66750/26100.1742.240906-0331.ge_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
+    ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Windows11Pro.iso"
     ;;
   3)
     OS_NAME="Tiny10 23H2 (Ringan - Win10)"
     IMAGE_NAME="Windows 10 Pro"
-    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66749/19045.2006.220908-0225.22h2_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
+    ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Tiny10.iso"
     ;;
   4)
     OS_NAME="Tiny11 23H2 (Ringan - Win11)"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66750/26100.1742.240906-0331.ge_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
+    ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Tiny11_23H2.iso"
     ;;
   5)
     OS_NAME="Tiny11 25H2 (Terbaru - Ringan)"
     IMAGE_NAME="Windows 11 Pro"
-    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66750/26100.1742.240906-0331.ge_release_svc_refresh_CLIENTMULTI_x64FRE_en-us.iso"
+    ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Tiny11_25H2.iso"
     ;;
   6)
     OS_NAME="Windows Server 2022"
     IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
-    ISO_URL="https://software-static.download.prss.microsoft.com/sg/download/888969d5-f34g-4e03-ac9d-1f9786c66749/SERVER_EVAL_x64FRE_en-us.iso"
+    ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/WindowsServer2022.iso"
     ;;
   7)
     OS_NAME="Windows Server 2025 Datacenter"
     IMAGE_NAME="Windows Server 2025 SERVERDATACENTER"
-    ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.32230.260111-0550.lt_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso"
+    ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/WindowsServer2025.iso"
     ;;
   *)
     echo -e "${RED}Pilihan tidak valid!${NC}"
