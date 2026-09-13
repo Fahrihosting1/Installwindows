@@ -23,10 +23,31 @@ fi
 
 echo "[OK] Backup dibuat di: $BACKUP"
 
-# Set password root
+# Set password root - baca dari /dev/tty agar bisa interaktif saat curl | bash
 echo
 echo "Buat password baru untuk user root:"
-passwd root
+
+while true; do
+    read -s -p "New password: " PASSWORD < /dev/tty
+    echo
+    read -s -p "Retype new password: " PASSWORD2 < /dev/tty
+    echo
+
+    if [ "$PASSWORD" != "$PASSWORD2" ]; then
+        echo "[ERROR] Password tidak cocok, coba lagi."
+        continue
+    fi
+
+    if [ -z "$PASSWORD" ]; then
+        echo "[ERROR] Password tidak boleh kosong, coba lagi."
+        continue
+    fi
+
+    echo "root:$PASSWORD" | chpasswd
+    echo "[OK] Password root berhasil diperbarui."
+    unset PASSWORD PASSWORD2
+    break
+done
 
 # Buat override config agar tidak bentrok dengan cloud-init/config lain
 cat > /etc/ssh/sshd_config.d/99-password-login.conf <<'EOF'
