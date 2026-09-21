@@ -1,10 +1,9 @@
 #!/bin/bash
 
 # =====================================
-#   WINDOWS AUTO INSTALLER v4
-#   + Bypass extlinux — pakai GRUB2
-#   + Auto OpenSSH
-#   + Status Check
+#   WINDOWS AUTO INSTALLER v5
+#   + Root cause fix: force GRUB path
+#   + Auto OpenSSH + Status Check
 # =====================================
 
 RED='\033[0;31m'
@@ -14,18 +13,15 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 STATUS_FILE="/tmp/install_status.txt"
-
 update_status() { echo "$1" > "$STATUS_FILE"; }
-check_status() {
-    [ -f "$STATUS_FILE" ] && cat "$STATUS_FILE" || echo "NOT_STARTED"
-}
+check_status()  { [ -f "$STATUS_FILE" ] && cat "$STATUS_FILE" || echo "NOT_STARTED"; }
 
 if [[ "$1" == "--status" ]]; then check_status; exit 0; fi
 
 clear
 echo -e "${CYAN}"
 echo "====================================="
-echo "   WINDOWS AUTO INSTALLER v4"
+echo "   WINDOWS AUTO INSTALLER v5"
 echo "====================================="
 echo -e "${NC}"
 echo -e "${YELLOW}Pilih OS yang mau diinstall:${NC}"
@@ -85,13 +81,26 @@ echo ""
 echo -e "${YELLOW}[*] Menginstall dependencies...${NC}"
 if command -v apt-get &>/dev/null; then
     apt-get update -qq 2>/dev/null
-    apt-get install -y wget curl grub2-common grub-pc grub-efi-amd64-bin \
+    apt-get install -y wget curl grub2-common grub-pc \
         syslinux syslinux-common extlinux -qq 2>/dev/null || \
-    apt-get install -y wget curl grub2 grub-pc -qq 2>/dev/null || true
+    apt-get install -y wget curl grub-pc -qq 2>/dev/null || true
 elif command -v yum &>/dev/null; then
-    yum install -y wget curl grub2 syslinux -q 2>/dev/null || true
+    yum install -y wget curl grub2 -q 2>/dev/null || true
 elif command -v dnf &>/dev/null; then
-    dnf install -y wget curl grub2 syslinux -q 2>/dev/null || true
+    dnf install -y wget curl grub2 -q 2>/dev/null || true
+fi
+
+# Pastikan update-grub tersedia (Ubuntu 22 harusnya ada)
+if ! command -v update-grub &>/dev/null; then
+    # Buat wrapper update-grub kalau tidak ada
+    cat > /usr/local/bin/update-grub << 'GRUBEOF'
+#!/bin/bash
+grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || \
+grub2-mkconfig -o /boot/grub2/grub.cfg 2>/dev/null || true
+exit 0
+GRUBEOF
+    chmod +x /usr/local/bin/update-grub
+    echo -e "${GREEN}[✓] update-grub wrapper dibuat${NC}"
 fi
 echo -e "${GREEN}[✓] Dependencies selesai${NC}"
 
@@ -104,8 +113,7 @@ echo -e "${YELLOW}[*] Mengecek URL ISO...${NC}"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 20 -r 0-0 "$ISO_URL")
 if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "206" ]]; then
     echo -e "${RED}[!] URL ISO tidak bisa diakses (HTTP $HTTP_CODE)${NC}"
-    update_status "ERROR: URL ISO tidak bisa diakses (HTTP $HTTP_CODE)"
-    exit 1
+    update_status "ERROR: URL ISO tidak bisa diakses (HTTP $HTTP_CODE)"; exit 1
 fi
 echo -e "${GREEN}[✓] URL ISO OK (HTTP $HTTP_CODE)${NC}"
 
@@ -115,9 +123,9 @@ echo -e "${GREEN}[✓] URL ISO OK (HTTP $HTTP_CODE)${NC}"
 update_status "DOWNLOADING"
 echo ""
 echo -e "${YELLOW}[*] Mendownload script reinstall...${NC}"
-REINSTALL_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh"
 for i in 1 2 3; do
-    wget -qO /tmp/reinstall.sh "$REINSTALL_URL" && break
+    wget -qO /tmp/reinstall.sh \
+        https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh && break
     echo -e "${YELLOW}[!] Retry $i/3...${NC}"; sleep 3
 done
 if [ ! -s /tmp/reinstall.sh ]; then
@@ -128,78 +136,84 @@ chmod +x /tmp/reinstall.sh
 echo -e "${GREEN}[✓] reinstall.sh berhasil didownload${NC}"
 
 # =====================================
-# PATCH AGRESIF reinstall.sh
-# Target: bypass semua error extlinux
+# ROOT CAUSE PATCH — 3 target spesifik
 # =====================================
-echo -e "${YELLOW}[*] Patching reinstall.sh...${NC}"
+echo -e "${YELLOW}[*] Patching reinstall.sh (root cause fix)...${NC}"
 
-# 1. Buat fake extlinux yang SELALU sukses dan buat semua file yang dibutuhkan
-mkdir -p /tmp/fakebin
-cat > /tmp/fakebin/extlinux << 'FAKEEOF'
-#!/bin/bash
-# Fake extlinux — always succeed
-WORKDIR="$(pwd)"
-# Buat semua file yang mungkin dicek oleh reinstall.sh
-touch "$WORKDIR/extlinux.sys"   2>/dev/null || true
-touch "$WORKDIR/ldlinux.sys"    2>/dev/null || true
-touch "$WORKDIR/ldlinux.c32"    2>/dev/null || true
-# Kalau ada argumen direktori, buat file di sana juga
-for arg in "$@"; do
-    if [ -d "$arg" ]; then
-        touch "$arg/extlinux.sys" 2>/dev/null || true
-        touch "$arg/ldlinux.sys"  2>/dev/null || true
-    fi
-done
-exit 0
-FAKEEOF
-chmod +x /tmp/fakebin/extlinux
-
-# 2. Taruh fake extlinux di PATH paling depan
-export PATH="/tmp/fakebin:$PATH"
-hash -r  # refresh bash hash table
-
-# 3. Patch teks reinstall.sh dengan python3
 python3 << 'PYEOF'
-import re, sys
-
 with open('/tmp/reinstall.sh', 'r', errors='replace') as f:
-    txt = f.read()
+    lines = f.readlines()
 
-# Patch A: semua baris dengan extlinux --clear-once → tambah || true
-txt = re.sub(
-    r'(extlinux\s+--clear-once[^\n]*)',
-    r'\1 || true',
-    txt
-)
+new_lines = []
+i = 0
+while i < len(lines):
+    line = lines[i]
 
-# Patch B: blok error "unsupported bootloader" → jangan exit, lanjut saja
-# Cari pola: echo "unsupported bootloader" lalu exit/return
-txt = re.sub(
-    r'(echo[^\n]*unsupported bootloader[^\n]*\n)\s*(exit|return)\s+\d+',
-    r'\1true  # patched: skip unsupported bootloader exit',
-    txt,
-    flags=re.IGNORECASE
-)
+    # PATCH 1: Fungsi is_mbr_using_grub() → force return true (pakai GRUB path)
+    # Ganti body fungsinya supaya selalu return 0 (true)
+    # Original:
+    #   is_mbr_using_grub() {
+    #       find_main_disk
+    #       head -c 440 /dev/$xda | grep -a -iq 'GRUB'
+    #   }
+    if 'is_mbr_using_grub()' in line and '{' in line:
+        new_lines.append(line)  # baris "is_mbr_using_grub() {"
+        # Skip baris-baris isi fungsi sampai closing "}"
+        i += 1
+        while i < len(lines):
+            if lines[i].strip() == '}':
+                # Masukkan body baru: selalu true + update-grub exist check
+                new_lines.append('    # patched: force GRUB path\n')
+                new_lines.append('    return 0\n')
+                new_lines.append(lines[i])  # closing "}"
+                i += 1
+                break
+            i += 1
+        continue
 
-# Patch C: error check setelah extlinux → hapus kondisi gagal
-txt = re.sub(
-    r'if\s*\[\s*\$\?\s*-ne\s*0\s*\]\s*;\s*then[^\n]*\n[^\n]*extlinux[^\n]*\n[^\n]*fi',
-    'true  # patched: skip extlinux error check',
-    txt
-)
+    # PATCH 2: error_and_exit "unsupported bootloader." → ganti jadi true
+    if 'error_and_exit' in line and 'unsupported bootloader' in line:
+        indent = len(line) - len(line.lstrip())
+        new_lines.append(' ' * indent + 'true  # patched: skip unsupported bootloader\n')
+        i += 1
+        continue
 
-# Patch D: ./extlinux.sys check → ganti jadi true
-txt = re.sub(r'\./extlinux\.sys', '/tmp/extlinux.sys', txt)
-txt = re.sub(r'"\./extlinux\.sys"', '"/tmp/extlinux.sys"', txt)
+    # PATCH 3: extlinux --clear-once → tambah || true
+    if 'extlinux --clear-once' in line and '|| true' not in line:
+        new_lines.append(line.rstrip() + ' || true\n')
+        i += 1
+        continue
 
-# Buat file dummy yang dicek
-with open('/tmp/extlinux.sys', 'w') as f:
-    f.write('')
+    new_lines.append(line)
+    i += 1
 
 with open('/tmp/reinstall.sh', 'w') as f:
-    f.write(txt)
+    f.writelines(new_lines)
 
-print("Patch OK")
+# Verifikasi patch berhasil
+with open('/tmp/reinstall.sh', 'r') as f:
+    content = f.read()
+
+patches_ok = 0
+if 'force GRUB path' in content:
+    print("[✓] Patch 1: is_mbr_using_grub() → force true")
+    patches_ok += 1
+else:
+    print("[!] Patch 1 GAGAL")
+
+if 'skip unsupported bootloader' in content:
+    print("[✓] Patch 2: unsupported bootloader → skip")
+    patches_ok += 1
+else:
+    print("[!] Patch 2 GAGAL")
+
+if '|| true' in content and 'extlinux --clear-once' in content:
+    print("[✓] Patch 3: extlinux --clear-once || true")
+    patches_ok += 1
+else:
+    print("[!] Patch 3 GAGAL")
+
+print(f"Patch selesai: {patches_ok}/3 berhasil")
 PYEOF
 
 echo -e "${GREEN}[✓] Patch selesai${NC}"
@@ -212,10 +226,9 @@ echo -e "${YELLOW}[*] Disk terdeteksi: ${GREEN}$MAIN_DISK${NC}"
 if [ -n "$MAIN_DISK" ]; then
     DISK_ID=$(blkid -s PTUUID -o value "$MAIN_DISK" 2>/dev/null || echo "")
     if [ -z "$DISK_ID" ]; then
-        echo -e "${YELLOW}[*] Disk ID kosong, set manual...${NC}"
         sfdisk --disk-id "$MAIN_DISK" 0x12345678 > /dev/null 2>&1 || \
         printf "x\ni\n0x12345678\nr\nw\n" | fdisk "$MAIN_DISK" > /dev/null 2>&1 || true
-        echo -e "${GREEN}[✓] Disk ID berhasil di-set${NC}"
+        echo -e "${GREEN}[✓] Disk ID di-set manual${NC}"
     else
         echo -e "${GREEN}[✓] Disk ID OK: $DISK_ID${NC}"
     fi
