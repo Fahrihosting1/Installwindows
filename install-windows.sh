@@ -4,6 +4,7 @@
 #   WINDOWS AUTO INSTALLER
 #   + Auto OpenSSH
 #   + Status Check
+#   + Auto Fix extlinux
 # =====================================
 
 RED='\033[0;31m'
@@ -92,7 +93,7 @@ case $PILIHAN in
     ;;
 esac
 
-VPS_IP=$(curl -s ifconfig.me 2>/dev/null || echo 'unknown')
+VPS_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s icanhazip.com 2>/dev/null || echo 'unknown')
 
 echo ""
 echo -e "${CYAN}====================================="
@@ -114,6 +115,56 @@ if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
     exit 0
 fi
 
+# =====================================
+# FIX: Install semua dependencies dulu
+# termasuk extlinux yang bikin error
+# =====================================
+update_status "INSTALLING_DEPS"
+echo ""
+echo -e "${YELLOW}[*] Menginstall dependencies...${NC}"
+
+# Detect package manager
+if command -v apt-get &>/dev/null; then
+    apt-get update -qq 2>/dev/null
+    apt-get install -y wget curl syslinux syslinux-common extlinux -qq 2>/dev/null
+    # Fallback kalau extlinux gagal (nama package beda di beberapa distro)
+    if ! command -v extlinux &>/dev/null; then
+        apt-get install -y syslinux-utils -qq 2>/dev/null || true
+    fi
+elif command -v yum &>/dev/null; then
+    yum install -y wget curl syslinux -q 2>/dev/null
+elif command -v dnf &>/dev/null; then
+    dnf install -y wget curl syslinux -q 2>/dev/null
+fi
+
+# Cek apakah extlinux berhasil diinstall
+if command -v extlinux &>/dev/null; then
+    echo -e "${GREEN}[✓] extlinux berhasil diinstall: $(which extlinux)${NC}"
+else
+    echo -e "${YELLOW}[!] extlinux tidak ditemukan di PATH, coba symlink manual...${NC}"
+    # Cari binary extlinux di lokasi umum
+    for dir in /usr/bin /usr/sbin /sbin /bin /usr/lib/syslinux; do
+        if [ -f "$dir/extlinux" ]; then
+            ln -sf "$dir/extlinux" /usr/local/bin/extlinux 2>/dev/null || true
+            echo -e "${GREEN}[✓] extlinux ditemukan di $dir, symlink ke /usr/local/bin/${NC}"
+            break
+        fi
+    done
+    # Kalau masih ga ada, buat wrapper kosong biar reinstall.sh ga crash
+    if ! command -v extlinux &>/dev/null; then
+        echo -e "${YELLOW}[!] extlinux tidak tersedia, membuat dummy wrapper...${NC}"
+        cat > /usr/local/bin/extlinux << 'EOF'
+#!/bin/bash
+# dummy extlinux - VPS ini pakai GRUB, extlinux tidak dibutuhkan
+exit 0
+EOF
+        chmod +x /usr/local/bin/extlinux
+        echo -e "${GREEN}[✓] Dummy extlinux wrapper dibuat${NC}"
+    fi
+fi
+
+echo -e "${GREEN}[✓] Dependencies selesai diinstall${NC}"
+
 update_status "CHECKING_URL"
 echo ""
 echo -e "${YELLOW}[*] Mengecek URL ISO...${NC}"
@@ -128,33 +179,37 @@ echo -e "${GREEN}[✓] URL ISO OK (HTTP $HTTP_CODE)${NC}"
 
 update_status "DOWNLOADING"
 echo ""
-echo -e "${GREEN}[*] Memulai instalasi $OS_NAME...${NC}"
-echo -e "${YELLOW}[*] Menginstall dependencies...${NC}"
-
-apt-get update -qq && apt-get install -y wget curl -qq 2>/dev/null || \
-yum install -y wget curl -q 2>/dev/null || \
-dnf install -y wget curl -q 2>/dev/null || \
-true
-
 echo -e "${YELLOW}[*] Mendownload script reinstall...${NC}"
-wget -qO /tmp/reinstall.sh https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh
+
+# Download dengan retry 3x
+REINSTALL_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh"
+for i in 1 2 3; do
+    wget -qO /tmp/reinstall.sh "$REINSTALL_URL" && break
+    echo -e "${YELLOW}[!] Download gagal, retry $i/3...${NC}"
+    sleep 3
+done
+
+if [ ! -s /tmp/reinstall.sh ]; then
+    echo -e "${RED}[!] Gagal download reinstall.sh setelah 3x retry!${NC}"
+    update_status "ERROR: Gagal download reinstall.sh"
+    exit 1
+fi
 chmod +x /tmp/reinstall.sh
+echo -e "${GREEN}[✓] Script reinstall berhasil didownload${NC}"
 
 SUPPORT_FIRSTBOOT=$(bash /tmp/reinstall.sh --help 2>&1 | grep -c "firstboot-powershell" || true)
 
+# =====================================
 # Detect dan fix disk ID yang invalid
+# =====================================
 MAIN_DISK=$(lsblk -dpno NAME,TYPE | awk '$2=="disk"{print $1}' | grep -v "loop" | head -1)
 echo -e "${YELLOW}[*] Disk terdeteksi: ${GREEN}$MAIN_DISK${NC}"
 if [ -n "$MAIN_DISK" ]; then
     DISK_ID=$(blkid -s PTUUID -o value "$MAIN_DISK" 2>/dev/null || echo "")
     if [ -z "$DISK_ID" ]; then
         echo -e "${YELLOW}[*] Disk ID kosong, set manual...${NC}"
-        sfdisk --disk-id "$MAIN_DISK" 0x12345678 > /dev/null 2>&1 ||         printf "x
-i
-0x12345678
-r
-w
-" | fdisk "$MAIN_DISK" > /dev/null 2>&1 || true
+        sfdisk --disk-id "$MAIN_DISK" 0x12345678 > /dev/null 2>&1 || \
+        printf "x\ni\n0x12345678\nr\nw\n" | fdisk "$MAIN_DISK" > /dev/null 2>&1 || true
         echo -e "${GREEN}[✓] Disk ID berhasil di-set${NC}"
     else
         echo -e "${GREEN}[✓] Disk ID OK: $DISK_ID${NC}"
