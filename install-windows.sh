@@ -118,6 +118,83 @@ fi
 echo -e "${GREEN}[✓] URL ISO OK (HTTP $HTTP_CODE)${NC}"
 
 # =====================================
+# Deteksi provider (override: PROVIDER=linode|other bash install-windows.sh)
+# =====================================
+detect_provider() {
+    local v
+    v=$(cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/bios_vendor 2>/dev/null | tr 'A-Z' 'a-z')
+    echo "$v" | grep -q digitalocean && { echo other; return; }
+    echo "$v" | grep -q linode && { echo linode; return; }
+    # Linode metadata service: hanya Linode yang ngasih token di sini
+    if curl -fs -m 4 -X PUT -H "Metadata-Token-Expiry-Seconds: 60" \
+        http://169.254.169.254/v1/token 2>/dev/null | grep -q .; then
+        echo linode; return
+    fi
+    echo other
+}
+PROVIDER="${PROVIDER:-$(detect_provider)}"
+echo -e "${YELLOW}[*] Provider terdeteksi: ${GREEN}$PROVIDER${NC}"
+if [ "$PROVIDER" = "linode" ]; then
+    echo -e "${YELLOW}    (mode Linode: patch bootloader + auto Direct Disk)${NC}"
+else
+    echo -e "${YELLOW}    (mode normal: reinstall.sh upstream tanpa patch paksa)${NC}"
+fi
+
+if [ "$PROVIDER" = "linode" ]; then
+# =====================================
+# LINODE FIX: otomatis ganti boot ke Direct Disk
+# (host GRUB 2 Linode nggak bisa baca NTFS -> "prefix isn't set")
+# =====================================
+update_status "LINODE_API"
+echo ""
+echo -e "${YELLOW}[*] Setup Linode API (auto Direct Disk)...${NC}"
+LINODE_TOKEN="${LINODE_TOKEN:-}"
+if [ -z "$LINODE_TOKEN" ]; then
+    read -rsp "Linode API token (scope Linodes: Read/Write): " LINODE_TOKEN; echo
+fi
+
+LINODE_IDS=$(LINODE_TOKEN="$LINODE_TOKEN" VPS_IP="$VPS_IP" python3 - << 'PYEOF2'
+import json, os, urllib.request
+tok, ip = os.environ["LINODE_TOKEN"], os.environ["VPS_IP"]
+def api(path):
+    r = urllib.request.Request("https://api.linode.com/v4" + path,
+                               headers={"Authorization": "Bearer " + tok})
+    return json.load(urllib.request.urlopen(r, timeout=20))
+try:
+    for l in api("/linode/instances?page_size=500")["data"]:
+        if ip in l.get("ipv4", []):
+            cfgs = api("/linode/instances/%d/configs" % l["id"])["data"]
+            print("%d %d" % (l["id"], cfgs[0]["id"]))
+            break
+except Exception:
+    pass
+PYEOF2
+)
+LINODE_ID=$(echo "$LINODE_IDS" | awk '{print $1}')
+LINODE_CFG=$(echo "$LINODE_IDS" | awk '{print $2}')
+if [[ -z "$LINODE_ID" || -z "$LINODE_CFG" ]]; then
+    echo -e "${RED}[!] Linode ID/config nggak ketemu (cek token & scope). Dibatalkan biar VPS nggak nyangkut.${NC}"
+    update_status "ERROR: Linode API gagal"; exit 1
+fi
+echo -e "${GREEN}[✓] Linode ID=$LINODE_ID config=$LINODE_CFG${NC}"
+
+# Script yang dijalankan di dalam installer (Alpine) tepat sebelum reboot terakhir
+cat > /tmp/linode_fix.sh << LFEOF
+#!/bin/sh
+apk add curl ca-certificates >/dev/null 2>&1
+for i in 1 2 3 4 5; do
+    curl -fsS -X PUT \\
+      -H "Authorization: Bearer $LINODE_TOKEN" \\
+      -H "Content-Type: application/json" \\
+      -d '{"kernel":"linode/direct-disk"}' \\
+      https://api.linode.com/v4/linode/instances/$LINODE_ID/configs/$LINODE_CFG && break
+    sleep 3
+done
+LFEOF
+chmod +x /tmp/linode_fix.sh
+fi
+
+# =====================================
 # Download reinstall.sh
 # =====================================
 update_status "DOWNLOADING"
@@ -135,8 +212,9 @@ fi
 chmod +x /tmp/reinstall.sh
 echo -e "${GREEN}[✓] reinstall.sh berhasil didownload${NC}"
 
+if [ "$PROVIDER" = "linode" ]; then
 # =====================================
-# ROOT CAUSE PATCH — 3 target spesifik
+# ROOT CAUSE PATCH — 4 target spesifik
 # =====================================
 echo -e "${YELLOW}[*] Patching reinstall.sh (root cause fix)...${NC}"
 
@@ -184,6 +262,16 @@ while i < len(lines):
         i += 1
         continue
 
+    # PATCH 4: sisipkan fix Direct Disk ke trans.sh (jalan sebelum reboot terakhir)
+    if line.strip() == 'curl -Lo $initrd_dir/trans.sh $confhome/trans.sh':
+        indent = ' ' * (len(line) - len(line.lstrip()))
+        new_lines.append(line)
+        new_lines.append(indent + '# patched: linode direct-disk\n')
+        new_lines.append(indent + 'cp /tmp/linode_fix.sh $initrd_dir/linode_fix.sh\n')
+        new_lines.append(indent + "sed -i 's|^reboot$|sh /linode_fix.sh; reboot|' $initrd_dir/trans.sh\n")
+        i += 1
+        continue
+
     new_lines.append(line)
     i += 1
 
@@ -213,10 +301,25 @@ if '|| true' in content and 'extlinux --clear-once' in content:
 else:
     print("[!] Patch 3 GAGAL")
 
-print(f"Patch selesai: {patches_ok}/3 berhasil")
+if 'patched: linode direct-disk' in content:
+    print("[✓] Patch 4: Linode Direct Disk hook")
+    patches_ok += 1
+else:
+    print("[!] Patch 4 GAGAL")
+
+print(f"Patch selesai: {patches_ok}/4 berhasil")
+if patches_ok < 4:
+    raise SystemExit(1)
 PYEOF
+if [ $? -ne 0 ]; then
+    echo -e "${RED}[!] Patch gagal, dibatalkan (reinstall.sh upstream mungkin berubah).${NC}"
+    update_status "ERROR: patch gagal"; exit 1
+fi
 
 echo -e "${GREEN}[✓] Patch selesai${NC}"
+else
+    echo -e "${GREEN}[✓] Non-Linode: pakai reinstall.sh asli, tanpa patch${NC}"
+fi
 
 # =====================================
 # Detect dan fix disk ID
