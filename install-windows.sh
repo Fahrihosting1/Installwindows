@@ -54,7 +54,7 @@ case $PILIHAN in
   *) echo -e "${RED}Pilihan tidak valid!${NC}"; update_status "ERROR: Pilihan tidak valid"; exit 1 ;;
 esac
 
-VPS_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s icanhazip.com 2>/dev/null || echo 'unknown')
+VPS_IP=$(curl -4 -s -m 8 ifconfig.me 2>/dev/null || curl -4 -s -m 8 icanhazip.com 2>/dev/null || echo 'unknown')
 
 echo ""
 echo -e "${CYAN}====================================="
@@ -150,8 +150,10 @@ echo ""
 echo -e "${YELLOW}[*] Setup Linode API (auto Direct Disk)...${NC}"
 LINODE_TOKEN="${LINODE_TOKEN:-}"
 if [ -z "$LINODE_TOKEN" ]; then
-    read -rsp "Linode API token (scope Linodes: Read/Write): " LINODE_TOKEN; echo
+    read -rp "Linode API token (scope Linodes: Read/Write): " LINODE_TOKEN
 fi
+LINODE_TOKEN=$(echo "$LINODE_TOKEN" | tr -d '[:space:]')
+echo -e "${YELLOW}    Panjang token: ${#LINODE_TOKEN} karakter (normal: 64)${NC}"
 
 LINODE_IDS=$(LINODE_TOKEN="$LINODE_TOKEN" VPS_IP="$VPS_IP" python3 - << 'PYEOF2'
 import json, os, urllib.request
@@ -166,8 +168,10 @@ try:
             cfgs = api("/linode/instances/%d/configs" % l["id"])["data"]
             print("%d %d" % (l["id"], cfgs[0]["id"]))
             break
-except Exception:
-    pass
+    else:
+        print("ERR: IP %s tidak ada di akun ini" % ip, file=__import__("sys").stderr)
+except Exception as e:
+    print("ERR: %s" % e, file=__import__("sys").stderr)
 PYEOF2
 )
 LINODE_ID=$(echo "$LINODE_IDS" | awk '{print $1}')
