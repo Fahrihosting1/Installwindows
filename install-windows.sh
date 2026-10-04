@@ -182,9 +182,10 @@ if [[ -z "$LINODE_ID" || -z "$LINODE_CFG" ]]; then
 fi
 echo -e "${GREEN}[✓] Linode ID=$LINODE_ID config=$LINODE_CFG${NC}"
 
-# Script yang dijalankan di dalam installer (Alpine) tepat sebelum reboot terakhir
+# Perintah yang disisipkan LANGSUNG ke trans.sh (bukan file terpisah, karena
+# tahap 2 installer cuma nyalin trans.sh), jalan tepat sebelum reboot
 cat > /tmp/linode_fix.sh << LFEOF
-#!/bin/sh
+{
 apk add curl ca-certificates >/dev/null 2>&1
 for i in 1 2 3 4 5; do
     curl -fsS -X PUT \\
@@ -194,8 +195,22 @@ for i in 1 2 3 4 5; do
       https://api.linode.com/v4/linode/instances/$LINODE_ID/configs/$LINODE_CFG && break
     sleep 3
 done
+} || true
 LFEOF
-chmod +x /tmp/linode_fix.sh
+cat > /tmp/linode_inject.py << 'INJEOF'
+import sys
+p = sys.argv[1]
+fix = open('/tmp/linode_fix.sh').read()
+lines = open(p).read().split('\n')
+out, n = [], 0
+for l in lines:
+    if l == 'reboot':
+        out.append(fix.rstrip('\n'))
+        n += 1
+    out.append(l)
+open(p, 'w').write('\n'.join(out))
+print("linode hook disisipkan: %d tempat" % n)
+INJEOF
 fi
 
 # =====================================
@@ -271,8 +286,7 @@ while i < len(lines):
         indent = ' ' * (len(line) - len(line.lstrip()))
         new_lines.append(line)
         new_lines.append(indent + '# patched: linode direct-disk\n')
-        new_lines.append(indent + 'cp /tmp/linode_fix.sh $initrd_dir/linode_fix.sh\n')
-        new_lines.append(indent + "sed -i 's|^reboot$|sh /linode_fix.sh; reboot|' $initrd_dir/trans.sh\n")
+        new_lines.append(indent + 'python3 /tmp/linode_inject.py $initrd_dir/trans.sh\n')
         i += 1
         continue
 
