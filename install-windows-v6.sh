@@ -46,7 +46,7 @@ case $PILIHAN in
   4) OS_NAME="Tiny11 23H2 (Ringan - Win11)"; IMAGE_NAME="Windows 11 Pro"
      ISO_URL="https://drive.usercontent.google.com/download?id=1Pdv0elzNpa0Ivv_ALF7hRopDu-HhdAO_&export=download&confirm=t" ;;
   5) OS_NAME="Tiny11 25H2 (Terbaru - Ringan)"; IMAGE_NAME="Windows 11 Pro"
-     ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Tiny11_25H2.iso" ;;
+     ISO_URL="https://drive.usercontent.google.com/download?id=1gRA58BhxpHrNzdB0LECQeNNfZqMqPlPI&export=download&confirm=t" ;;
   6) OS_NAME="Windows Server 2022"; IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
      ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/WindowsServer2022.iso" ;;
   7) OS_NAME="Windows Server 2025 Datacenter"; IMAGE_NAME="Windows Server 2025 SERVERDATACENTER"
