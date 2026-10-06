@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =====================================
-#   WINDOWS AUTO INSTALLER v6
+#   WINDOWS AUTO INSTALLER v8
 #   + Root cause fix: force GRUB path
 #   + Auto OpenSSH + Status Check
 # =====================================
@@ -21,7 +21,7 @@ if [[ "$1" == "--status" ]]; then check_status; exit 0; fi
 clear
 echo -e "${CYAN}"
 echo "====================================="
-echo "   WINDOWS AUTO INSTALLER v6"
+echo "   WINDOWS AUTO INSTALLER v8"
 echo "====================================="
 echo -e "${NC}"
 echo -e "${YELLOW}Pilih OS yang mau diinstall:${NC}"
@@ -29,8 +29,8 @@ echo ""
 echo -e "  ${GREEN}[1]${NC} Windows 10 Pro (Original)"
 echo -e "  ${GREEN}[2]${NC} Windows 11 Pro (Original)"
 echo -e "  ${GREEN}[3]${NC} Tiny10 23H2 x64 (Ringan - Win10)"
-echo -e "  ${GREEN}[4]${NC} Tiny11 23H2 x64 (Ringan - Win11)"
-echo -e "  ${GREEN}[5]${NC} Tiny11 25H2 x64 (Terbaru - Ringan)"
+echo -e "  ${GREEN}[4]${NC} Tiny11 24H2 x64 (26100.6899 - Ringan)"
+echo -e "  ${GREEN}[5]${NC} Tiny11 25H2 x64 (26200.8737 - Terbaru)"
 echo -e "  ${GREEN}[6]${NC} Windows Server 2022"
 echo -e "  ${GREEN}[7]${NC} Windows Server 2025 Datacenter"
 echo ""
@@ -43,8 +43,8 @@ case $PILIHAN in
      ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Windows11Pro.iso" ;;
   3) OS_NAME="Tiny10 23H2 (Ringan - Win10)"; IMAGE_NAME="Windows 10 Pro"
      ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Tiny10.iso" ;;
-  4) OS_NAME="Tiny11 23H2 (Ringan - Win11)"; IMAGE_NAME="Windows 11 Pro"
-ISO_URL="https://huggingface.co/datasets/Biaapoke/windows-iso/resolve/main/tiny1126100.6899.iso" ;;
+  4) OS_NAME="Tiny11 24H2 (build 26100.6899 - Ringan)"; IMAGE_NAME="Windows 11 Pro"
+     ISO_URL="https://huggingface.co/datasets/Biaapoke/windows-iso/resolve/main/tiny1126100.6899.iso" ;;
   5) OS_NAME="Tiny11 25H2 (build 26200.8737 - Ringan)"; IMAGE_NAME="Windows 11 Pro"
      ISO_URL="https://huggingface.co/datasets/Biaapoke/windows-iso/resolve/main/tiny11.26200.8737.iso" ;;
   6) OS_NAME="Windows Server 2022"; IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
@@ -105,17 +105,80 @@ fi
 echo -e "${GREEN}[✓] Dependencies selesai${NC}"
 
 # =====================================
-# Cek URL ISO
+# Resolve link Google Drive (file besar -> halaman konfirmasi virus scan)
+# Tanpa ini aria2 cuma ngedownload HTML (~0 B) -> "mount: /iso: unable to read superblock"
+# =====================================
+resolve_gdrive() {
+python3 - "$1" << 'PYEOF3'
+import sys, re, html, urllib.request, urllib.parse, http.cookiejar
+url = sys.argv[1]
+m = re.search(r'[?&]id=([\w-]+)', url) or re.search(r'/d/([\w-]+)', url)
+if not m:
+    print(url); sys.exit(0)
+fid = m.group(1)
+base = "https://drive.usercontent.google.com/download"
+first = base + "?id=%s&export=download&confirm=t" % fid
+op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+op.addheaders = [("User-Agent", "Mozilla/5.0")]
+try:
+    r = op.open(first, timeout=30)
+    if "text/html" not in r.headers.get("Content-Type", ""):
+        r.close(); print(first); sys.exit(0)
+    body = r.read().decode("utf-8", "replace")
+except Exception as e:
+    print("ERR: %s" % e, file=sys.stderr); sys.exit(1)
+if "Quota exceeded" in body or "Too many users" in body:
+    print("ERR: kuota download Google Drive habis (coba lagi nanti / pakai R2)", file=sys.stderr); sys.exit(1)
+fm = re.search(r'<form[^>]+action="([^"]+)"', body)
+if not fm:
+    print("ERR: file Drive tidak public / halaman konfirmasi tidak dikenali", file=sys.stderr); sys.exit(1)
+params = {k: html.unescape(v) for k, v in re.findall(r'<input[^>]+name="([^"]+)"[^>]+value="([^"]*)"', body)}
+print(html.unescape(fm.group(1)) + "?" + urllib.parse.urlencode(params))
+PYEOF3
+}
+
+if [[ "$ISO_URL" == *drive.google.com* || "$ISO_URL" == *drive.usercontent.google.com* ]]; then
+    update_status "RESOLVING_GDRIVE"
+    echo ""
+    echo -e "${YELLOW}[*] Resolve link Google Drive...${NC}"
+    ISO_URL=$(resolve_gdrive "$ISO_URL")
+    if [[ -z "$ISO_URL" || "$ISO_URL" == ERR* ]]; then
+        echo -e "${RED}[!] Gagal resolve link Drive (pastikan file 'Anyone with the link').${NC}"
+        update_status "ERROR: gdrive resolve gagal"; exit 1
+    fi
+    echo -e "${GREEN}[✓] Link Drive OK${NC}"
+fi
+
+# =====================================
+# Cek URL ISO (harus bukan HTML & ukuran masuk akal)
 # =====================================
 update_status "CHECKING_URL"
 echo ""
 echo -e "${YELLOW}[*] Mengecek URL ISO...${NC}"
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 20 -r 0-0 "$ISO_URL")
+HDR=$(curl -s -o /dev/null -D - -L --max-time 30 -r 0-0 "$ISO_URL" | tr -d '\r')
+HTTP_CODE=$(echo "$HDR" | grep -i '^HTTP' | tail -1 | awk '{print $2}')
 if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "206" ]]; then
     echo -e "${RED}[!] URL ISO tidak bisa diakses (HTTP $HTTP_CODE)${NC}"
     update_status "ERROR: URL ISO tidak bisa diakses (HTTP $HTTP_CODE)"; exit 1
 fi
+LAST_HDR=$(echo "$HDR" | awk 'BEGIN{b=""} /^HTTP/{b=""} {b=b"\n"$0} END{print b}')
+if echo "$LAST_HDR" | grep -iq '^content-type: *text/html'; then
+    echo -e "${RED}[!] URL ISO ngembaliin halaman HTML, bukan file ISO (link Drive private / kuota habis).${NC}"
+    update_status "ERROR: URL ISO bukan file ISO"; exit 1
+fi
 echo -e "${GREEN}[✓] URL ISO OK (HTTP $HTTP_CODE)${NC}"
+
+# Ukuran asli ISO (dari Content-Range). Dipakai buat nentuin ukuran partisi installer,
+# karena wget --spider di installer salah baca ukuran di link redirect (HuggingFace dll)
+# -> partisi cuma 200M -> "cp: cannot create regular file /os/installer/..."
+ISO_SIZE=$(echo "$LAST_HDR" | grep -i '^content-range:' | tail -1 | sed 's|.*/||' | tr -dc '0-9')
+if [[ -z "$ISO_SIZE" || "$ISO_SIZE" -lt 104857600 ]]; then
+    ISO_SIZE=$((10 * 1024 * 1024 * 1024))
+    echo -e "${YELLOW}[!] Ukuran ISO nggak kebaca, pakai default 10GB${NC}"
+else
+    echo -e "${GREEN}[✓] Ukuran ISO: $((ISO_SIZE / 1024 / 1024)) MiB${NC}"
+fi
+echo "$ISO_SIZE" > /tmp/iso_size_bytes
 
 # =====================================
 # Deteksi provider (override: PROVIDER=linode|other bash install-windows.sh)
@@ -210,6 +273,8 @@ for l in lines:
     out.append(l)
 open(p, 'w').write('\n'.join(out))
 print("linode hook disisipkan: %d tempat" % n)
+if n == 0:
+    sys.exit(1)
 INJEOF
 fi
 
@@ -337,6 +402,43 @@ fi
 echo -e "${GREEN}[✓] Patch selesai${NC}"
 else
     echo -e "${GREEN}[✓] Non-Linode: pakai reinstall.sh asli, tanpa patch${NC}"
+fi
+
+# =====================================
+# PATCH UKURAN PARTISI INSTALLER (semua provider)
+# =====================================
+cat > /tmp/size_inject.py << 'SZEOF'
+import sys
+p = sys.argv[1]
+size = int(open('/tmp/iso_size_bytes').read().strip())
+t = open(p).read()
+key = 'part_size="$((size_bytes / 1024 / 1024 + 200))MiB"'
+if key not in t:
+    sys.exit(1)
+fix = ('size_bytes=%d  # patched: real ISO size\n        ' % size) + key
+t = t.replace(key, fix, 1)
+open(p, 'w').write(t)
+print("ukuran partisi installer dipatch: %d bytes" % size)
+SZEOF
+python3 - << 'PYEOF4'
+lines = open('/tmp/reinstall.sh', errors='replace').read().split('\n')
+out, n = [], 0
+for l in lines:
+    out.append(l)
+    if l.strip() == 'curl -Lo $initrd_dir/trans.sh $confhome/trans.sh':
+        ind = l[:len(l) - len(l.lstrip())]
+        out.append(ind + '# patched: real iso size')
+        out.append(ind + 'python3 /tmp/size_inject.py $initrd_dir/trans.sh || { echo "gagal patch ukuran partisi"; exit 1; }')
+        n += 1
+if n == 0:
+    print("[!] Patch ukuran partisi GAGAL (reinstall.sh upstream berubah)")
+    raise SystemExit(1)
+open('/tmp/reinstall.sh', 'w').write('\n'.join(out))
+print("[✓] Patch ukuran partisi installer: %d tempat" % n)
+PYEOF4
+if [ $? -ne 0 ]; then
+    echo -e "${RED}[!] Patch ukuran partisi gagal, dibatalkan.${NC}"
+    update_status "ERROR: patch ukuran gagal"; exit 1
 fi
 
 # =====================================
