@@ -414,6 +414,10 @@ if key not in t:
     sys.exit(1)
 fix = ('size_bytes=%d  # patched: real ISO size\n        ' % size) + key
 t = t.replace(key, fix, 1)
+# locale kosong/invalid (image Tiny tanpa metadata Default Language) -> Setup nampilin pilih bahasa
+lk = "locale=$(get_selected_image_prop 'Default Language')"
+if lk in t:
+    t = t.replace(lk, lk + '\n    case "$locale" in [a-z][a-z]-*|[a-z][a-z][a-z]-*) ;; *) locale=en-US ;; esac', 1)
 open(p, 'w').write(t)
 print("ukuran partisi installer dipatch: %d bytes" % size)
 SZEOF
