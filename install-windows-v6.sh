@@ -308,38 +308,45 @@ i = 0
 while i < len(lines):
     line = lines[i]
 
-    # PATCH 1: Fungsi is_mbr_using_grub() → force return true (pakai GRUB path)
-    # Ganti body fungsinya supaya selalu return 0 (true)
-    # Original:
-    #   is_mbr_using_grub() {
-    #       find_main_disk
-    #       head -c 440 /dev/$xda | grep -a -iq 'GRUB'
-    #   }
+    # PATCH 1: paksa deteksi bootloader = GRUB
+    # Upstream LAMA: is_mbr_using_grub() { ... }  -> body diganti return 0
     if 'is_mbr_using_grub()' in line and '{' in line:
-        new_lines.append(line)  # baris "is_mbr_using_grub() {"
-        # Skip baris-baris isi fungsi sampai closing "}"
+        new_lines.append(line)
         i += 1
         while i < len(lines):
             if lines[i].strip() == '}':
-                # Masukkan body baru: selalu true + update-grub exist check
                 new_lines.append('    # patched: force GRUB path\n')
                 new_lines.append('    return 0\n')
-                new_lines.append(lines[i])  # closing "}"
+                new_lines.append(lines[i])
                 i += 1
                 break
             i += 1
         continue
+    # Upstream BARU: get_local_bootloader_type() cek marker "GRUB" di MBR.
+    # Di Linode (Direct Disk) MBR tidak ada marker GRUB -> hilangkan syarat itu.
+    if 'head -c 446 /dev/$xda' in line and 'tail -c 128' in line and 'grep -a -Fq GRUB' in line:
+        indent = ' ' * (len(line) - len(line.lstrip()))
+        new_lines.append(indent + 'true; then  # patched: force GRUB path\n')
+        i += 1
+        continue
 
-    # PATCH 2: error_and_exit "unsupported bootloader." → ganti jadi true
+    # PATCH 2: jangan error kalau bootloader tidak terdeteksi, fallback ke grub
+    # Upstream LAMA: error_and_exit "unsupported bootloader."
     if 'error_and_exit' in line and 'unsupported bootloader' in line:
-        indent = len(line) - len(line.lstrip())
-        new_lines.append(' ' * indent + 'true  # patched: skip unsupported bootloader\n')
+        indent = ' ' * (len(line) - len(line.lstrip()))
+        new_lines.append(indent + 'true  # patched: skip unsupported bootloader\n')
+        i += 1
+        continue
+    # Upstream BARU: error_and_exit "Unknown bootloader type."
+    if 'error_and_exit' in line and 'Unknown bootloader type' in line:
+        indent = ' ' * (len(line) - len(line.lstrip()))
+        new_lines.append(indent + '_bootloader_type="grub"  # patched: skip unsupported bootloader\n')
         i += 1
         continue
 
     # PATCH 3: extlinux --clear-once → tambah || true
     if 'extlinux --clear-once' in line and '|| true' not in line:
-        new_lines.append(line.rstrip() + ' || true\n')
+        new_lines.append(line.rstrip() + ' || true  # patched: clear-once\n')
         i += 1
         continue
 
@@ -375,7 +382,7 @@ if 'skip unsupported bootloader' in content:
 else:
     print("[!] Patch 2 GAGAL")
 
-if '|| true' in content and 'extlinux --clear-once' in content:
+if 'patched: clear-once' in content:
     print("[✓] Patch 3: extlinux --clear-once || true")
     patches_ok += 1
 else:
