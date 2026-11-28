@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =====================================
-#   WINDOWS AUTO INSTALLER v9 FAST
+#   WINDOWS AUTO INSTALLER v10 FAST
 #   + Root cause fix: force GRUB path
 #   + Auto OpenSSH + Status Check
 # =====================================
@@ -21,7 +21,7 @@ if [[ "$1" == "--status" ]]; then check_status; exit 0; fi
 clear 2>/dev/null || true
 echo -e "${CYAN}"
 echo "====================================="
-echo "   WINDOWS AUTO INSTALLER v9 FAST"
+echo "   WINDOWS AUTO INSTALLER v10 FAST"
 echo "====================================="
 echo -e "${NC}"
 echo -e "${YELLOW}Pilih OS yang mau diinstall:${NC}"
@@ -33,7 +33,7 @@ echo -e "  ${GREEN}[4]${NC} Tiny11 24H2 x64 (26100.6899 - Ringan)"
 echo -e "  ${GREEN}[5]${NC} Windows Server 2022"
 echo -e "  ${GREEN}[6]${NC} Windows Server 2025 Datacenter"
 echo ""
-read -p "Masukkan pilihan [1-6]: " PILIHAN
+if [[ -n "${BOT_OS:-}" ]]; then PILIHAN="$BOT_OS"; else read -p "Masukkan pilihan [1-6]: " PILIHAN; fi
 
 case $PILIHAN in
   1) OS_NAME="Windows 10 Pro"; IMAGE_NAME="Windows 10 Pro"
@@ -80,7 +80,7 @@ echo -e "${RED}WARNING: Semua data di VPS akan TERHAPUS!${NC}"
 echo ""
 read -p "Lanjut install? [y/N]: " CONFIRM
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
-    echo -e "${YELLOW}Install dibatalkan.${NC}"; update_status "CANCELLED"; exit 0
+    echo -e "${YELLOW}Install dibatalkan.${NC}"; update_status "CANCELLED"; exit 42
 fi
 
 # =====================================
@@ -455,6 +455,13 @@ t = t.replace(key, fix, 1)
 lk = "locale=$(get_selected_image_prop 'Default Language')"
 if lk in t:
     t = t.replace(lk, lk + '\n    case "$locale" in [a-z][a-z]-*|[a-z][a-z][a-z]-*) ;; *) locale=en-US ;; esac', 1)
+# Speed up ISO downloads when the server supports byte ranges.
+old = 'if aria2c "$url" "$@"; then'
+new = 'if (case "$url" in *.iso|*.iso\\?*) aria2c -x 8 -s 8 -k 4M --file-allocation=none "$url" "$@" ;; *) aria2c "$url" "$@" ;; esac); then'
+if t.count(old) == 1:
+    t = t.replace(old, new, 1)
+else:
+    print("Download hook not matched; retaining upstream downloader")
 open(p, 'w').write(t)
 print("ukuran partisi installer dipatch: %d bytes" % size)
 SZEOF
