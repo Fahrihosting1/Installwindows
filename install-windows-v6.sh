@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =====================================
-#   WINDOWS AUTO INSTALLER v8
+#   WINDOWS AUTO INSTALLER v9 FAST
 #   + Root cause fix: force GRUB path
 #   + Auto OpenSSH + Status Check
 # =====================================
@@ -18,10 +18,10 @@ check_status()  { [ -f "$STATUS_FILE" ] && cat "$STATUS_FILE" || echo "NOT_START
 
 if [[ "$1" == "--status" ]]; then check_status; exit 0; fi
 
-clear
+clear 2>/dev/null || true
 echo -e "${CYAN}"
 echo "====================================="
-echo "   WINDOWS AUTO INSTALLER v8"
+echo "   WINDOWS AUTO INSTALLER v9 FAST"
 echo "====================================="
 echo -e "${NC}"
 echo -e "${YELLOW}Pilih OS yang mau diinstall:${NC}"
@@ -51,15 +51,28 @@ case $PILIHAN in
   *) echo -e "${RED}Pilihan tidak valid!${NC}"; update_status "ERROR: Pilihan tidak valid"; exit 1 ;;
 esac
 
+# Optional prebuilt Windows 10 disk image; ISO remains default.
+FAST_IMAGE="${WIN10_DD_URL:-}"
+INSTALL_MODE=iso
+if [[ "$PILIHAN" == 1 && -n "$FAST_IMAGE" ]]; then
+    [[ "$FAST_IMAGE" == https://* ]] || { echo "DD image must use HTTPS"; exit 1; }
+    INSTALL_MODE=dd
+fi
+if [[ $EUID -ne 0 ]]; then echo "Run as root"; exit 1; fi
 VPS_IP=$(curl -4 -s -m 8 ifconfig.me 2>/dev/null || curl -4 -s -m 8 icanhazip.com 2>/dev/null || echo 'unknown')
 
+WIN_PASSWORD="${WIN_PASSWORD:-}"
+if [[ -z "$WIN_PASSWORD" ]]; then
+    WIN_PASSWORD="Aa9!$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')"
+fi
+umask 077
 echo ""
 echo -e "${CYAN}====================================="
 echo -e " OS dipilih : ${GREEN}$OS_NAME${CYAN}"
 echo -e " Username   : ${GREEN}Administrator${CYAN}"
-echo -e " Password   : ${GREEN}Admin123${CYAN}"
+echo -e " Password   : ${GREEN}${WIN_PASSWORD}${CYAN}"
 echo -e " RDP Port   : ${GREEN}3389${CYAN}"
-echo -e " SSH Port   : ${GREEN}22${CYAN}"
+echo -e " Mode       : ${GREEN}$INSTALL_MODE${CYAN}"
 echo -e " IP VPS     : ${GREEN}$VPS_IP${CYAN}"
 echo -e "=====================================${NC}"
 echo ""
@@ -75,7 +88,10 @@ fi
 # =====================================
 update_status "INSTALLING_DEPS"
 echo ""
-echo -e "${YELLOW}[*] Menginstall dependencies...${NC}"
+echo -e "${YELLOW}[*] Mengecek dependencies...${NC}"
+if command -v wget >/dev/null && command -v curl >/dev/null && command -v python3 >/dev/null && command -v grub-mkconfig >/dev/null && command -v update-grub >/dev/null; then
+    echo "Dependencies sudah tersedia"
+else
 if command -v apt-get &>/dev/null; then
     apt-get update -qq 2>/dev/null
     apt-get install -y wget curl grub2-common grub-pc \
@@ -85,6 +101,8 @@ elif command -v yum &>/dev/null; then
     yum install -y wget curl grub2 -q 2>/dev/null || true
 elif command -v dnf &>/dev/null; then
     dnf install -y wget curl grub2 -q 2>/dev/null || true
+fi
+
 fi
 
 # Pastikan update-grub tersedia (Ubuntu 22 harusnya ada)
@@ -152,7 +170,12 @@ fi
 update_status "CHECKING_URL"
 echo ""
 echo -e "${YELLOW}[*] Mengecek URL ISO...${NC}"
-HDR=$(curl -s -o /dev/null -D - -L --max-time 30 -r 0-0 "$ISO_URL" | tr -d '\r')
+CHECK_URL="$ISO_URL"
+[[ "$INSTALL_MODE" == dd ]] && CHECK_URL="$FAST_IMAGE"
+HDR=$(curl -sS -I -L --max-time 15 "$CHECK_URL" | tr -d '\r')
+if ! echo "$HDR" | grep -Eq '^HTTP/[^ ]+ (200|206)'; then
+    HDR=$(curl -s -o /dev/null -D - -L --max-time 15 --max-filesize 1048576 -r 0-0 "$CHECK_URL" | tr -d '\r')
+fi
 HTTP_CODE=$(echo "$HDR" | grep -i '^HTTP' | tail -1 | awk '{print $2}')
 if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "206" ]]; then
     echo -e "${RED}[!] URL ISO tidak bisa diakses (HTTP $HTTP_CODE)${NC}"
@@ -169,6 +192,9 @@ echo -e "${GREEN}[✓] URL ISO OK (HTTP $HTTP_CODE)${NC}"
 # karena wget --spider di installer salah baca ukuran di link redirect (HuggingFace dll)
 # -> partisi cuma 200M -> "cp: cannot create regular file /os/installer/..."
 ISO_SIZE=$(echo "$LAST_HDR" | grep -i '^content-range:' | tail -1 | sed 's|.*/||' | tr -dc '0-9')
+if [[ -z "$ISO_SIZE" ]]; then
+    ISO_SIZE=$(echo "$LAST_HDR" | awk 'tolower($1)=="content-length:" {print $2}' | tail -1 | tr -dc "0-9")
+fi
 if [[ -z "$ISO_SIZE" || "$ISO_SIZE" -lt 104857600 ]]; then
     ISO_SIZE=$((10 * 1024 * 1024 * 1024))
     echo -e "${YELLOW}[!] Ukuran ISO nggak kebaca, pakai default 10GB${NC}"
@@ -193,6 +219,9 @@ detect_provider() {
     echo other
 }
 PROVIDER="${PROVIDER:-$(detect_provider)}"
+if [[ "$INSTALL_MODE" == dd && "$PROVIDER" == linode ]]; then
+    update_status "ERROR: DD Linode belum diuji"; echo "DD Linode belum diuji; gunakan ISO atau uji pada VPS disposable."; exit 1
+fi
 echo -e "${YELLOW}[*] Provider terdeteksi: ${GREEN}$PROVIDER${NC}"
 if [ "$PROVIDER" = "linode" ]; then
     echo -e "${YELLOW}    (mode Linode: patch bootloader + auto Direct Disk)${NC}"
@@ -411,6 +440,7 @@ fi
 # =====================================
 # PATCH UKURAN PARTISI INSTALLER (semua provider)
 # =====================================
+if [[ "$INSTALL_MODE" == iso ]]; then
 cat > /tmp/size_inject.py << 'SZEOF'
 import sys
 p = sys.argv[1]
@@ -450,6 +480,8 @@ if [ $? -ne 0 ]; then
 fi
 
 # =====================================
+fi
+
 # Detect dan fix disk ID
 # =====================================
 MAIN_DISK=$(lsblk -dpno NAME,TYPE | awk '$2=="disk"{print $1}' | grep -v "loop" | head -1)
@@ -470,42 +502,41 @@ fi
 # =====================================
 update_status "INSTALLING"
 echo -e "${YELLOW}[*] Menjalankan instalasi Windows...${NC}"
-echo -e "${YELLOW}[*] Proses ini membutuhkan waktu 30-60 menit...${NC}"
+echo -e "${YELLOW}[*] Mode $INSTALL_MODE; durasi bergantung pada jaringan dan disk...${NC}"
 echo ""
 
+# ISO setup: OpenSSH is optional, to avoid delaying RDP readiness.
 OPENSSH_SCRIPT='Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0; Start-Service sshd; Set-Service -Name sshd -StartupType Automatic; New-NetFirewallRule -Name sshd -DisplayName "OpenSSH Server" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22'
-
-SUPPORT_FIRSTBOOT=$(bash /tmp/reinstall.sh --help 2>&1 | grep -c "firstboot-powershell" || true)
-
-if [[ "$SUPPORT_FIRSTBOOT" -gt 0 ]]; then
-    bash /tmp/reinstall.sh windows \
-      --image-name "$IMAGE_NAME" \
-      --iso "$ISO_URL" \
-      --username Administrator \
-      --password Admin123 \
-      --rdp-port 3389 \
-      --firstboot-powershell "$OPENSSH_SCRIPT"
+if [[ "$INSTALL_MODE" == dd ]]; then
+    echo "Fast mode: deploying prepared Windows image"
+    bash /tmp/reinstall.sh dd --img "$FAST_IMAGE" --password "$WIN_PASSWORD" --rdp-port 3389
+    RESULT=$?
 else
-    bash /tmp/reinstall.sh windows \
-      --image-name "$IMAGE_NAME" \
-      --iso "$ISO_URL" \
-      --username Administrator \
-      --password Admin123 \
-      --rdp-port 3389
+    args=(windows --image-name "$IMAGE_NAME" --iso "$ISO_URL" --username Administrator --password "$WIN_PASSWORD")
+    if [[ "${ENABLE_OPENSSH:-0}" == 1 ]] && bash /tmp/reinstall.sh --help 2>&1 | grep -q 'firstboot-powershell'; then
+        args+=(--firstboot-powershell "$OPENSSH_SCRIPT")
+    fi
+    bash /tmp/reinstall.sh "${args[@]}"
+    RESULT=$?
+fi
+if [[ $RESULT -ne 0 ]]; then
+    update_status "ERROR: reinstall exit $RESULT"
+    echo "Installer failed; automatic reboot cancelled."
+    exit "$RESULT"
 fi
 
 update_status "REBOOTING"
 echo ""
 echo -e "${GREEN}====================================="
-echo -e " Install selesai! VPS akan reboot..."
-echo -e " Tunggu 15-30 menit lalu akses ke:"
+echo -e " Persiapan selesai! VPS akan reboot untuk instalasi..."
+echo -e " Akses setelah Windows dan RDP siap:"
 echo -e " IP       : $VPS_IP"
 echo -e " RDP Port : 3389"
-echo -e " SSH Port : 22"
+echo -e " SSH Windows: opsional (ENABLE_OPENSSH=1 untuk ISO jika didukung)"
 echo -e " Username : Administrator"
-echo -e " Password : Admin123"
+echo -e " Password : ${WIN_PASSWORD}"
 echo -e "=====================================${NC}"
 
-update_status "DONE: IP=$VPS_IP RDP=3389 SSH=22 USER=Administrator PASS=Admin123"
+update_status "REBOOTING: IP=$VPS_IP RDP=3389 (Windows belum terverifikasi)"
 
 reboot
