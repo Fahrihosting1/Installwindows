@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =====================================
-#   WINDOWS AUTO INSTALLER v10 FAST
+#   WINDOWS AUTO INSTALLER v11 FAST
 #   + Root cause fix: force GRUB path
 #   + Auto OpenSSH + Status Check
 # =====================================
@@ -21,7 +21,7 @@ if [[ "$1" == "--status" ]]; then check_status; exit 0; fi
 clear 2>/dev/null || true
 echo -e "${CYAN}"
 echo "====================================="
-echo "   WINDOWS AUTO INSTALLER v10 FAST"
+echo "   WINDOWS AUTO INSTALLER v11 FAST"
 echo "====================================="
 echo -e "${NC}"
 echo -e "${YELLOW}Pilih OS yang mau diinstall:${NC}"
