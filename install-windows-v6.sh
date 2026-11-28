@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # =====================================
-#   WINDOWS AUTO INSTALLER v11 FAST
+#   WINDOWS AUTO INSTALLER v14 FAST + SSH BOT
 #   + Root cause fix: force GRUB path
+#   + Tiny10/Tiny11 NTDEV Archive URLs refreshed
 #   + Auto OpenSSH + Status Check
 # =====================================
 
@@ -21,15 +22,15 @@ if [[ "$1" == "--status" ]]; then check_status; exit 0; fi
 clear 2>/dev/null || true
 echo -e "${CYAN}"
 echo "====================================="
-echo "   WINDOWS AUTO INSTALLER v11 FAST"
+echo "   WINDOWS AUTO INSTALLER v13 FAST"
 echo "====================================="
 echo -e "${NC}"
 echo -e "${YELLOW}Pilih OS yang mau diinstall:${NC}"
 echo ""
 echo -e "  ${GREEN}[1]${NC} Windows 10 Pro (Original)"
 echo -e "  ${GREEN}[2]${NC} Windows 11 Pro (Original)"
-echo -e "  ${GREEN}[3]${NC} Tiny10 23H2 x64 (Ringan - Win10)"
-echo -e "  ${GREEN}[4]${NC} Tiny11 24H2 x64 (26100.6899 - Ringan)"
+echo -e "  ${GREEN}[3]${NC} Tiny10 23H2 x64 (NTDEV - Ringan)"
+echo -e "  ${GREEN}[4]${NC} Tiny11 24H2 x64 (26100.1742 - NTDEV)"
 echo -e "  ${GREEN}[5]${NC} Windows Server 2022"
 echo -e "  ${GREEN}[6]${NC} Windows Server 2025 Datacenter"
 echo ""
@@ -40,10 +41,12 @@ case $PILIHAN in
      ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Windows10Pro.iso" ;;
   2) OS_NAME="Windows 11 Pro"; IMAGE_NAME="Windows 11 Pro"
      ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Windows11Pro.iso" ;;
-  3) OS_NAME="Tiny10 23H2 (Ringan - Win10)"; IMAGE_NAME="Windows 10 Pro"
-     ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/Tiny10.iso" ;;
-  4) OS_NAME="Tiny11 24H2 (build 26100.6899 - Ringan)"; IMAGE_NAME="Windows 11 Pro"
-     ISO_URL="https://huggingface.co/datasets/Biaapoke/windows-iso/resolve/main/tiny1126100.6899.iso" ;;
+  # Tiny10 23H2 x64 NTDEV (based on Windows 10 Enterprise LTSC 2021)
+  3) OS_NAME="Tiny10 23H2 x64 (NTDEV)"; IMAGE_NAME="Windows 10 Enterprise LTSC 2021"
+     ISO_URL="https://archive.org/download/tiny-10-23-h2/tiny10%20x64%2023h2.iso" ;;
+  # Tiny11 24H2 x64 NTDEV (build 26100.1742)
+  4) OS_NAME="Tiny11 24H2 x64 (26100.1742 - NTDEV)"; IMAGE_NAME="Windows 11 Pro"
+     ISO_URL="https://archive.org/download/tiny-11-24-h-2-x-64-26100.1742/tiny11%2024H2%20x64%20-%2026100.1742.iso" ;;
   5) OS_NAME="Windows Server 2022"; IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
      ISO_URL="https://pub-6dbb0a827a924e12aecd6e56406c953b.r2.dev/WindowsServer2022.iso" ;;
   6) OS_NAME="Windows Server 2025 Datacenter"; IMAGE_NAME="Windows Server 2025 SERVERDATACENTER"
@@ -78,7 +81,12 @@ echo -e "=====================================${NC}"
 echo ""
 echo -e "${RED}WARNING: Semua data di VPS akan TERHAPUS!${NC}"
 echo ""
-read -p "Lanjut install? [y/N]: " CONFIRM
+if [[ "${BOT_AUTO_CONFIRM:-0}" == "1" ]]; then
+    CONFIRM="y"
+    echo -e "${GREEN}[✓] Konfirmasi penghapusan disk diterima dari Telegram.${NC}"
+else
+    read -r -p "Lanjut install? [y/N]: " CONFIRM
+fi
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
     echo -e "${YELLOW}Install dibatalkan.${NC}"; update_status "CANCELLED"; exit 42
 fi
@@ -239,7 +247,8 @@ echo ""
 echo -e "${YELLOW}[*] Setup Linode API (auto Direct Disk)...${NC}"
 LINODE_TOKEN="${LINODE_TOKEN:-}"
 if [ -z "$LINODE_TOKEN" ]; then
-    read -rp "Linode API token (scope Linodes: Read/Write): " LINODE_TOKEN
+    read -rsp "Linode API token (scope Linodes: Read/Write): " LINODE_TOKEN
+    echo
 fi
 LINODE_TOKEN=$(echo "$LINODE_TOKEN" | tr -d '[:space:]')
 echo -e "${YELLOW}    Panjang token: ${#LINODE_TOKEN} karakter (normal: 64)${NC}"
